@@ -1,0 +1,67 @@
+name: Compilar Phoop
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Elegir Xcode más reciente
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Usando $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Descargar tipografía Saira Condensed
+        run: |
+          mkdir -p Phoop/Resources/Fonts
+          for w in Bold SemiBold Medium; do
+            curl -sSfL -o "Phoop/Resources/Fonts/SairaCondensed-$w.ttf" \
+              "https://raw.githubusercontent.com/google/fonts/main/ofl/sairacondensed/SairaCondensed-$w.ttf"
+          done
+          curl -sSfL -o Phoop/Resources/Fonts/OFL.txt \
+            "https://raw.githubusercontent.com/google/fonts/main/ofl/sairacondensed/OFL.txt"
+
+      - name: Generar proyecto Xcode
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Compilar
+        run: |
+          xcodebuild -project Phoop.xcodeproj -scheme Phoop -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || { grep -E "error:" build.log | sort -u | head -60; tail -40 build.log; exit 1; }
+          grep -E "warning:" build.log | sort -u | head -20 || true
+
+      - name: Empaquetar .ipa (con permisos de Salud)
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Phoop.app
+          codesign --force --sign - --entitlements Phoop/Phoop.entitlements "$APP"
+          mkdir -p Payload && cp -R "$APP" Payload/
+          zip -qry Phoop.ipa Payload
+          ls -la Phoop.ipa
+
+      - name: Guardar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: Phoop-ipa
+          path: Phoop.ipa
+
+      - name: Publicar en Releases (enlace directo para el iPhone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Phoop.ipa --title "Phoop (última versión)" \
+            --notes "Compilado automáticamente desde ${GITHUB_SHA::7}. Instálalo con SideStore." --prerelease

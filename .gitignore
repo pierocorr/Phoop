@@ -1,0 +1,8 @@
+*.xcodeproj/
+build/
+Payload/
+*.ipa
+.DS_Store
+xcuserdata/
+Phoop/Info.plist
+Phoop/Resources/Fonts/*.ttf
