@@ -1,4 +1,4 @@
-# Ritmo
+# Peak
 
 App local para iPhone para la pulsera **Loop Life (SOOP)**. Todo se guarda en el teléfono; sin cuentas ni nube.
 
@@ -13,7 +13,7 @@ App local para iPhone para la pulsera **Loop Life (SOOP)**. Todo se guarda en el
 ## Instalar
 
 1. Cada cambio en `main` se compila solo (pestaña **Actions**).
-2. El `.ipa` queda en **Releases → latest** (`Ritmo.ipa`).
+2. El `.ipa` queda en **Releases → latest** (`Peak.ipa`).
 3. Instálalo con iLoader (**Import IPA**) o SideStore.
 
 El protocolo de la pulsera está documentado en `docs/PROTOCOLO_YC.md`.

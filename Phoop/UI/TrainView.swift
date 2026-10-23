@@ -24,7 +24,7 @@ struct TrainView: View {
     private var picker: some View {
         Screen {
             ScreenTitle(title: "Entrenar").appear()
-            Text("Elige una actividad. Ritmo mide tu pulso en vivo y calcula el esfuerzo, las zonas y las calorías.")
+            Text("Elige una actividad. Peak mide tu pulso en vivo y calcula el esfuerzo, las zonas y las calorías.")
                 .font(Theme.body(14)).foregroundStyle(Theme.secondary).appear(0.03)
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {

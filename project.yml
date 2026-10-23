@@ -27,7 +27,7 @@ targets:
     info:
       path: Phoop/Info.plist
       properties:
-        CFBundleDisplayName: Ritmo
+        CFBundleDisplayName: Peak
         CFBundleDevelopmentRegion: es
         CFBundleLocalizations: [es]
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -38,11 +38,11 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [bluetooth-central, fetch]
         BGTaskSchedulerPermittedIdentifiers: [com.phoop.app.sync]
-        NSBluetoothAlwaysUsageDescription: Ritmo se conecta a tu pulsera para leer tu pulso, sueño y actividad.
-        NSHealthShareUsageDescription: Ritmo puede leer datos de Apple Salud para completar tus métricas.
-        NSHealthUpdateUsageDescription: Ritmo guarda en Apple Salud el pulso, HRV, oxígeno, temperatura, pasos, sueño y entrenamientos de tu pulsera.
-        NSCameraUsageDescription: Ritmo usa la cámara para la función de cámara remota desde la pulsera.
-        NSPhotoLibraryAddUsageDescription: Ritmo guarda en Fotos las fotos tomadas con la cámara remota.
+        NSBluetoothAlwaysUsageDescription: Peak se conecta a tu pulsera para leer tu pulso, sueño y actividad.
+        NSHealthShareUsageDescription: Peak puede leer datos de Apple Salud para completar tus métricas.
+        NSHealthUpdateUsageDescription: Peak guarda en Apple Salud el pulso, HRV, oxígeno, temperatura, pasos, sueño y entrenamientos de tu pulsera.
+        NSCameraUsageDescription: Peak usa la cámara para la función de cámara remota desde la pulsera.
+        NSPhotoLibraryAddUsageDescription: Peak guarda en Fotos las fotos tomadas con la cámara remota.
         UIAppFonts:
           - SairaCondensed-Bold.ttf
           - SairaCondensed-SemiBold.ttf

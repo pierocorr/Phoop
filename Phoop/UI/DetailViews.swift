@@ -118,7 +118,7 @@ struct SleepDetailView: View {
                 }.appear(0.1)
             } else {
                 Card {
-                    Text("No hay una noche registrada para este día. Duerme con la pulsera puesta y abre Ritmo al despertar.")
+                    Text("No hay una noche registrada para este día. Duerme con la pulsera puesta y abre Peak al despertar.")
                         .font(Theme.body(15)).foregroundStyle(Theme.secondary)
                 }.appear()
             }

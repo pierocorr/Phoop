@@ -21,8 +21,11 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 22) {
                         topBar.appear(0)
-                        Text(AppInfo.name.uppercased())
-                            .font(Theme.body(15, .semibold)).tracking(4).foregroundStyle(Theme.text.opacity(0.85))
+                        HStack(spacing: 8) {
+                            Image(systemName: "mountain.2").font(.system(size: 14, weight: .semibold))
+                            Text(AppInfo.name.uppercased()).font(Theme.body(15, .semibold)).tracking(4)
+                        }
+                        .foregroundStyle(Theme.text.opacity(0.85))
                             .appear(0.02)
                         rings.appear(0.05)
                         stepsCard.appear(0.09)
@@ -323,5 +326,5 @@ struct WorkoutRow: View {
 
 /// Nombre visible de la app (un solo lugar para cambiarlo).
 enum AppInfo {
-    static let name = "Ritmo"
+    static let name = "Peak"
 }

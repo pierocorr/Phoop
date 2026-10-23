@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct RitmoApp: App {
+struct PeakApp: App {
     let container: ModelContainer
 
     init() {

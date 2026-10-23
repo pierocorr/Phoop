@@ -1,4 +1,4 @@
-name: Compilar Ritmo
+name: Compilar Peak
 
 on:
   push:
@@ -49,19 +49,19 @@ jobs:
           APP=build/Build/Products/Release-iphoneos/Phoop.app
           codesign --force --sign - --entitlements Phoop/Phoop.entitlements "$APP"
           mkdir -p Payload && cp -R "$APP" Payload/
-          zip -qry Ritmo.ipa Payload
-          ls -la Ritmo.ipa
+          zip -qry Peak.ipa Payload
+          ls -la Peak.ipa
 
       - name: Guardar como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: Ritmo-ipa
-          path: Ritmo.ipa
+          name: Peak-ipa
+          path: Peak.ipa
 
       - name: Publicar en Releases (enlace directo para el iPhone)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest Ritmo.ipa --title "Ritmo (última versión)" \
+          gh release create latest Peak.ipa --title "Peak (última versión)" \
             --notes "Compilado automáticamente desde ${GITHUB_SHA::7}. Instálalo con SideStore." --prerelease
