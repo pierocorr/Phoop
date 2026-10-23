@@ -8,6 +8,8 @@ final class DayStore: ObservableObject {
     @Published private(set) var day = DayMetrics()
     @Published private(set) var today = DayMetrics()
     @Published private(set) var history: [DayMetrics] = []   // últimos 30 días
+    @Published var tab = 0
+    @Published var showTrain = false
 
     func refresh(_ context: ModelContext) {
         today = MetricsEngine.compute(context: context)
@@ -43,7 +45,6 @@ struct RootView: View {
     @EnvironmentObject private var sync: SyncEngine
     @StateObject private var store = DayStore()
     @StateObject private var finder = PhoneFinder.shared
-    @State private var tab = 0
 
     init() {
         let a = UITabBarAppearance()
@@ -54,17 +55,22 @@ struct RootView: View {
     }
 
     var body: some View {
-        TabView(selection: $tab) {
+        TabView(selection: $store.tab) {
             HomeView().tag(0)
-                .tabItem { Label("Inicio", systemImage: "circle.circle") }
-            TrendsView().tag(1)
+                .tabItem { Label("Inicio", systemImage: "house") }
+            HealthView().tag(1)
+                .tabItem { Label("Salud", systemImage: "heart.text.square") }
+            TrendsView().tag(2)
                 .tabItem { Label("Tendencias", systemImage: "chart.bar.xaxis") }
-            TrainView().tag(2)
-                .tabItem { Label("Entrenar", systemImage: "figure.run") }
-            HealthView().tag(3)
-                .tabItem { Label("Salud", systemImage: "waveform.path.ecg") }
-            MoreView().tag(4)
+            MoreView().tag(3)
                 .tabItem { Label("Más", systemImage: "line.3.horizontal") }
+        }
+        .sheet(isPresented: $store.showTrain) {
+            TrainView()
+                .environmentObject(store)
+                .environmentObject(band)
+                .environmentObject(sync)
+                .presentationDragIndicator(.visible)
         }
         .tint(Theme.recovery)
         .environmentObject(store)

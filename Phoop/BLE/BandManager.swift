@@ -54,7 +54,7 @@ final class BandManager: NSObject, ObservableObject {
     let events = PassthroughSubject<Event, Never>()
 
     /// Nombre que se muestra dentro de la app.
-    static let displayName = "Ritmo Band"
+    static let displayName = "\(AppInfo.name) Band"
 
     // MARK: CoreBluetooth
 
