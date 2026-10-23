@@ -107,6 +107,14 @@ enum YC {
             frame(1, 0x0C, [on ? 1 : 0, UInt8(clamping: minutes)])
         }
 
+        /// Monitoreo automático de SpO₂ y de temperatura (on/off + intervalo en minutos).
+        static func spo2Monitor(on: Bool, minutes: Int) -> Data {
+            frame(1, 0x26, [on ? 1 : 0, UInt8(clamping: minutes)])
+        }
+        static func tempMonitor(on: Bool, minutes: Int) -> Data {
+            frame(1, 0x20, [on ? 1 : 0, UInt8(clamping: minutes)])
+        }
+
         /// Meta diaria de pasos (la pulsera vibra al alcanzarla).
         static func stepGoal(_ steps: Int) -> Data {
             let s = UInt32(clamping: steps)

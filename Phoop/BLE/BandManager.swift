@@ -54,6 +54,7 @@ final class BandManager: NSObject, ObservableObject {
     private let evtReassembler = YC.Reassembler()
     private var readyWaiters: [CheckedContinuation<Bool, Never>] = []
     private var handshakeDone = false
+    private var handshakeStarted = false
 
     private let savedIDKey = "phoop.peripheralID"
     private let writeTypeKey = "phoop.writeWithResponse"
@@ -265,7 +266,9 @@ final class BandManager: NSObject, ObservableObject {
     // MARK: Paquetes entrantes
 
     private func handle(_ p: YC.Packet) {
-        appendLog(outgoing: false, "\(String(format: "%02X %02X", p.group, p.key)) · \(YC.hex(p.payload))\(p.crcOK ? "" : " (CRC!)")")
+        // La pulsera repite su dirección MAC (02 02) cada ~20 s: no ensuciar el registro.
+        let isMacEcho = p.group == 2 && p.key == 2 && pending?.match(p) != true
+        if !isMacEcho { appendLog(outgoing: false, "\(String(format: "%02X %02X", p.group, p.key)) · \(YC.hex(p.payload))\(p.crcOK ? "" : " (CRC!)")") }
 
         if p.group == YC.Group.health.rawValue, historyKind != nil {
             handleHistory(p)
@@ -338,6 +341,7 @@ extension BandManager: CBCentralManagerDelegate {
             appendLog(outgoing: false, "Conectado a \(peripheral.name ?? "pulsera")")
             cmdReassembler.reset(); evtReassembler.reset()
             handshakeDone = false
+            handshakeStarted = false
             peripheral.discoverServices([CBUUID(string: YC.commandService),
                                          CBUUID(string: YC.heartService),
                                          CBUUID(string: YC.pedometerService)])
@@ -357,6 +361,7 @@ extension BandManager: CBCentralManagerDelegate {
             state = .disconnected
             commandChar = nil; eventChar = nil
             handshakeDone = false
+            handshakeStarted = false
             liveHR = nil
             appendLog(outgoing: false, "Desconectada")
             finishHistory(nil)
@@ -398,7 +403,8 @@ extension BandManager: CBPeripheralDelegate {
                 default: break
                 }
             }
-            if commandChar != nil, eventChar != nil, !handshakeDone, state != .handshaking {
+            if commandChar != nil, eventChar != nil, !handshakeDone, !handshakeStarted {
+                handshakeStarted = true
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 600_000_000) // dejar que se activen las indicaciones
                     await self.handshake()

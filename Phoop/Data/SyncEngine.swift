@@ -132,6 +132,8 @@ final class SyncEngine: ObservableObject {
         _ = await band.request(YC.Cmd.userInfo(heightCm: Settings.heightCm, weightKg: Settings.weightKg,
                                                female: Settings.female, age: Settings.age))
         _ = await band.request(YC.Cmd.heartMonitor(on: true, minutes: Settings.heartInterval))
+        _ = await band.request(YC.Cmd.tempMonitor(on: true, minutes: Settings.heartInterval))
+        _ = await band.request(YC.Cmd.spo2Monitor(on: true, minutes: max(30, Settings.heartInterval)))
     }
 
     // MARK: Segundo plano
