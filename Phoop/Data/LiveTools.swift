@@ -7,6 +7,7 @@ import Photos
 import UIKit
 
 /// Mediciones manuales (pulso, SpO₂, HRV, estrés, temperatura) desde la app.
+/// El valor se muestra en vivo y se guarda al instante, sin esperar al historial.
 @MainActor
 final class MeasureManager: ObservableObject {
     static let shared = MeasureManager()
@@ -16,6 +17,13 @@ final class MeasureManager: ObservableObject {
     @Published private(set) var liveValue: String?
     private var bag = Set<AnyCancellable>()
     private var timeoutTask: Task<Void, Never>?
+    private var pollTask: Task<Void, Never>?
+
+    // Últimos valores vistos durante la medición.
+    private var bpm: Int?
+    private var spo2: Int?
+    private var hrv: Int?
+    private var temp: Double?
 
     private init() {
         let band = BandManager.shared
@@ -24,38 +32,72 @@ final class MeasureManager: ObservableObject {
             switch ev {
             case let .measureResult(type, status):
                 guard self.running?.rawValue == type else { return }
+                if status == 1 { self.saveNow() }
                 self.finish(status == 1 ? "Medición guardada" : (status == 2 ? "No se pudo medir. Ajusta la pulsera e inténtalo de nuevo." : "Medición cancelada"))
             case let .combined(c):
-                guard let t = self.running else { return }
-                switch t {
-                case .heart: if c.bpm > 0 { self.liveValue = "\(c.bpm) lpm" }
-                case .spo2: if let v = c.spo2, v > 0 { self.liveValue = "\(v) %" }
-                case .hrv: if let v = c.hrv, v > 0 { self.liveValue = "\(v) ms" }
-                case .temp: if let v = c.tempC { self.liveValue = String(format: "%.1f °C", v) }
-                case .stress: break
-                }
+                guard self.running != nil else { return }
+                if c.bpm > 0 { self.bpm = c.bpm }
+                if let v = c.spo2, v > 0 { self.spo2 = v }
+                if let v = c.hrv, v > 0 { self.hrv = v }
+                if let v = c.tempC { self.temp = v }
+                self.updateLive()
             default: break
             }
         }.store(in: &bag)
-        band.heartSubject.sink { [weak self] bpm in
-            if self?.running == .heart { self?.liveValue = "\(bpm) lpm" }
+        band.heartSubject.sink { [weak self] v in
+            guard let self, self.running != nil else { return }
+            self.bpm = v
+            self.updateLive()
         }.store(in: &bag)
     }
 
+    private func updateLive() {
+        guard let t = running else { return }
+        switch t {
+        case .heart: liveValue = bpm.map { "\($0) lpm" }
+        case .spo2: liveValue = spo2.map { "\($0) %" }
+        case .hrv: liveValue = hrv.map { "\($0) ms" }
+        case .temp: liveValue = temp.map { String(format: "%.1f °C", $0) }
+        case .stress: liveValue = nil
+        }
+    }
+
     func start(_ type: YC.MeasureType) {
-        guard running == nil, BandManager.shared.state == .ready else {
-            message = BandManager.shared.state == .ready ? nil : "Conecta la pulsera primero"
+        let band = BandManager.shared
+        guard running == nil, band.state == .ready else {
+            message = band.state == .ready ? nil : "Conecta la pulsera primero"
             return
         }
         running = type
         liveValue = nil
+        bpm = nil; spo2 = nil; hrv = nil; temp = nil
         message = "Midiendo \(type.label.lowercased())… no muevas el brazo"
-        BandManager.shared.send(YC.Cmd.measure(type, start: true))
+        band.send(YC.Cmd.measure(type, start: true))
+
+        // Temperatura y SpO₂: pedir el valor actual cada 2 s para verlo al momento.
+        if type == .temp || type == .spo2 {
+            pollTask = Task { @MainActor in
+                while !Task.isCancelled, self.running == type {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard self.running == type else { break }
+                    if type == .temp, let p = await band.request(YC.Cmd.realTemp(), timeout: 1.5),
+                       p.payload.count >= 2, p.payload[0] > 0 {
+                        self.temp = Double("\(p.payload[0]).\(p.payload[1])")
+                    }
+                    if type == .spo2, let p = await band.request(YC.Cmd.realSpO2(), timeout: 1.5),
+                       p.payload.count >= 2, p.payload[1] > 0 {
+                        self.spo2 = Int(p.payload[1])
+                    }
+                    self.updateLive()
+                }
+            }
+        }
+
         timeoutTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 90_000_000_000)
             if self.running == type {
-                BandManager.shared.send(YC.Cmd.measure(type, start: false))
-                await SyncEngine.shared.syncKinds([type.history])
+                band.send(YC.Cmd.measure(type, start: false))
+                self.saveNow()
                 self.finish("Medición terminada")
             }
         }
@@ -67,8 +109,25 @@ final class MeasureManager: ObservableObject {
         finish("Medición cancelada")
     }
 
+    /// Guarda lo medido como una muestra nueva para que aparezca de inmediato en toda la app.
+    private func saveNow() {
+        guard let t = running, let ctx = SyncEngine.shared.container?.mainContext else { return }
+        let hasValue = bpm != nil || spo2 != nil || hrv != nil || temp != nil
+        if hasValue {
+            let now = Date()
+            ctx.insert(HealthSample(time: now, bpm: bpm ?? 0, hrv: hrv ?? 0, spo2: spo2 ?? 0,
+                                    respiration: 0, tempC: temp, steps: 0))
+            if let b = bpm { ctx.insert(HeartSample(time: now, bpm: b, live: true)) }
+            try? ctx.save()
+            SyncEngine.shared.bump()
+        }
+        // Además, descargar el historial de la pulsera (por ejemplo, el estrés).
+        Task { await SyncEngine.shared.syncKinds([t.history]) }
+    }
+
     private func finish(_ text: String) {
         timeoutTask?.cancel()
+        pollTask?.cancel()
         running = nil
         message = text
         Task { @MainActor in

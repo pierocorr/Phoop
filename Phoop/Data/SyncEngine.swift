@@ -36,16 +36,6 @@ final class SyncEngine: ObservableObject {
             .sink { [weak self] _ in Task { await self?.sync() } }
             .store(in: &bag)
 
-        // Al terminar una medición manual, descargar ese historial.
-        band.events
-            .sink { [weak self] ev in
-                if case let .measureResult(type, status) = ev, status == 1,
-                   let t = YC.MeasureType(rawValue: type) {
-                    Task { await self?.syncKinds([t.history]) }
-                }
-            }
-            .store(in: &bag)
-
         // Y cada 30 minutos mientras siga conectada.
         timer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { _ in
             Task { @MainActor in

@@ -144,6 +144,10 @@ enum YC {
         /// Modo entrenamiento (pulso continuo): [1 inicio / 0 fin, deporte].
         static func workoutMode(start: Bool, sport: UInt8 = 0) -> Data { frame(3, 0x0C, [start ? 1 : 0, sport]) }
 
+        /// Lectura instantánea de temperatura ("entero.decimal") y SpO₂ ([midiendo, valor]).
+        static func realTemp() -> Data { frame(2, 0x0E) }
+        static func realSpO2() -> Data { frame(2, 0x11, [0x49, 0x53]) }
+
         /// Transmisión en vivo (pulso y pasos) mientras la app está abierta.
         static func realtime(_ on: Bool) -> Data { frame(3, 0x09, [on ? 1 : 0, 0, 2]) }
 

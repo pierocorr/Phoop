@@ -125,7 +125,6 @@ struct Ring: View {
                 .trim(from: 0, to: max(0.002, min(1, animated)))
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: color.opacity(0.45), radius: animated > 0.01 ? 6 : 0)
             VStack(spacing: 0) {
                 Text(label)
                     .font(Theme.display(size * 0.3))
