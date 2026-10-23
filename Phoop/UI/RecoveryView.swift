@@ -20,15 +20,16 @@ struct RecoveryView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
 
-            MetricRow(title: "HRV", subtitle: "Variabilidad cardíaca",
-                      value: d.hrv.map { "\($0) ms" } ?? "—",
+            MetricRow(title: "HRV", subtitle: d.hrv == nil && d.latestHRV != nil ? "Última medición" : "Variabilidad cardíaca",
+                      value: d.shownHRV.map { "\($0) ms" } ?? "—",
                       delta: delta(d.hrv, d.hrvBaseline, unit: ""), deltaGood: (d.hrv ?? 0) >= (d.hrvBaseline ?? 0))
             MetricRow(title: "Pulso en reposo", subtitle: "Mínimo estable al dormir",
                       value: d.restingHR.map { "\($0) lpm" } ?? "—",
                       delta: delta(d.restingHR, d.restingHRBaseline, unit: ""), deltaGood: (d.restingHR ?? 0) <= (d.restingHRBaseline ?? 999))
-            MetricRow(title: "Oxígeno (SpO₂)", subtitle: "Promedio nocturno", value: d.spo2.map { "\($0)%" } ?? "—")
-            MetricRow(title: "Temperatura", subtitle: "Muñeca", value: d.tempC.map { String(format: "%.1f °C", $0) } ?? "—")
-            if let r = d.respiration {
+            MetricRow(title: "Oxígeno (SpO₂)", subtitle: d.spo2 == nil && d.latestSpO2 != nil ? "Última medición" : "Promedio nocturno",
+                      value: d.shownSpO2.map { "\($0)%" } ?? "—")
+            MetricRow(title: "Temperatura", subtitle: "Muñeca", value: d.shownTemp.map { String(format: "%.1f °C", $0) } ?? "—")
+            if let r = d.respiration ?? d.latestResp {
                 MetricRow(title: "Respiración", subtitle: "Por minuto, noche", value: "\(r) rpm")
             }
 

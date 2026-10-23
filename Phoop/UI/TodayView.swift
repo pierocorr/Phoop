@@ -50,7 +50,7 @@ struct TodayView: View {
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
                 StatTile(title: "Pulso ahora", value: band.liveHR.map(String.init) ?? "—", unit: "lpm")
-                StatTile(title: "HRV", value: d.hrv.map(String.init) ?? "—", unit: "ms")
+                StatTile(title: "HRV", value: d.shownHRV.map(String.init) ?? "—", unit: "ms")
                 Card(padding: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Pasos · meta \(formatSteps(stepGoal))").font(Theme.body(12)).foregroundStyle(Theme.secondary)
@@ -58,7 +58,7 @@ struct TodayView: View {
                         ProgressBar(value: Double(steps) / Double(max(1, stepGoal)), color: Theme.strain)
                     }
                 }
-                StatTile(title: "SpO₂", value: d.spo2.map(String.init) ?? "—", unit: "%")
+                StatTile(title: "SpO₂", value: d.shownSpO2.map(String.init) ?? "—", unit: "%")
             }
 
             if !sync.status.isEmpty {

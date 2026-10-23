@@ -1,6 +1,7 @@
 name: Phoop
 options:
   bundleIdPrefix: com.phoop
+  developmentLanguage: es
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -27,6 +28,8 @@ targets:
       path: Phoop/Info.plist
       properties:
         CFBundleDisplayName: Phoop
+        CFBundleDevelopmentRegion: es
+        CFBundleLocalizations: [es]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:

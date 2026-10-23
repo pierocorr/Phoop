@@ -20,6 +20,17 @@ struct DayMetrics {
     var tempC: Double?
     var respiration: Int?
 
+    // Última medición del día (aunque no haya noche registrada)
+    var latestHRV: Int?
+    var latestSpO2: Int?
+    var latestTemp: Double?
+    var latestResp: Int?
+    var latestTime: Date?
+
+    var shownHRV: Int? { hrv ?? latestHRV }
+    var shownSpO2: Int? { spo2 ?? latestSpO2 }
+    var shownTemp: Double? { tempC ?? latestTemp }
+
     // Esfuerzo
     var strain: Double = 0               // 0…21
     var zoneMinutes: [Int] = [0, 0, 0, 0, 0] // Z1…Z5
@@ -131,6 +142,18 @@ enum MetricsEngine {
             if let z = zone { m.zoneMinutes[z] += Int(minutes.rounded()) }
         }
         m.strain = (21 * (1 - exp(-trimp / 110)) * 10).rounded() / 10
+
+        // --- Últimas mediciones (24 h)
+        let dayAgo = now.addingTimeInterval(-86400)
+        var recent = FetchDescriptor<HealthSample>(predicate: #Predicate { $0.time >= dayAgo && $0.time <= now },
+                                                   sortBy: [SortDescriptor(\.time, order: .reverse)])
+        recent.fetchLimit = 300
+        let rs = (try? context.fetch(recent)) ?? []
+        m.latestHRV = rs.first { $0.hrv > 0 }?.hrv
+        m.latestSpO2 = rs.first { $0.spo2 > 0 }?.spo2
+        m.latestTemp = rs.first { $0.tempC != nil }?.tempC
+        m.latestResp = rs.first { $0.respiration > 0 }?.respiration
+        m.latestTime = rs.first?.time
 
         // --- Actividad de hoy
         let acts = (try? context.fetch(FetchDescriptor<ActivityInterval>(predicate: #Predicate { $0.start >= startOfDay }))) ?? []
