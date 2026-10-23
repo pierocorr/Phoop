@@ -129,10 +129,64 @@ enum YC {
         static func history(_ kind: HistoryKind) -> Data { frame(5, kind.rawValue) }
         static func deleteHistory(_ kind: HistoryKind) -> Data { frame(5, kind.deleteKey) }
         static func historyAck(ok: Bool) -> Data { frame(5, 0x80, [ok ? 0 : 4]) }
+
+        /// Alarma de pulso: avisa si supera `max` (o baja de `min`, 0 = sin mínimo).
+        static func heartAlarm(on: Bool, max: Int, min: Int = 0) -> Data {
+            frame(1, 0x0B, [on ? 1 : 0, UInt8(clamping: max), UInt8(clamping: min)])
+        }
+
+        /// Hace vibrar la pulsera: [on, repeticiones, intervalo].
+        static func findBand() -> Data { frame(3, 0x00, [1, 5, 2]) }
+
+        /// Medición manual en la pulsera.
+        static func measure(_ type: MeasureType, start: Bool) -> Data { frame(3, 0x2F, [start ? 1 : 0, type.rawValue]) }
+
+        /// Modo entrenamiento (pulso continuo): [1 inicio / 0 fin, deporte].
+        static func workoutMode(start: Bool, sport: UInt8 = 0) -> Data { frame(3, 0x0C, [start ? 1 : 0, sport]) }
+
+        /// Transmisión en vivo (pulso y pasos) mientras la app está abierta.
+        static func realtime(_ on: Bool) -> Data { frame(3, 0x09, [on ? 1 : 0, 0, 2]) }
+
+        /// Modo cámara remota en la pulsera.
+        static func cameraMode(_ on: Bool) -> Data { frame(3, 0x0E, [on ? 1 : 0]) }
+
+        /// Prueba de ECG.
+        static func ecg(start: Bool) -> Data { frame(3, 0x02, [start ? 2 : 0]) }
+    }
+
+    enum MeasureType: UInt8, CaseIterable, Identifiable {
+        case heart = 0, spo2 = 2, temp = 4, hrv = 10, stress = 12
+        var id: UInt8 { rawValue }
+        var label: String {
+            switch self {
+            case .heart: return "Pulso"
+            case .spo2: return "SpO₂"
+            case .temp: return "Temperatura"
+            case .hrv: return "HRV"
+            case .stress: return "Estrés"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .heart: return "heart.fill"
+            case .spo2: return "drop.fill"
+            case .temp: return "thermometer.medium"
+            case .hrv: return "waveform.path.ecg"
+            case .stress: return "brain.head.profile"
+            }
+        }
+        /// Historial que hay que descargar al terminar.
+        var history: HistoryKind {
+            switch self {
+            case .heart: return .heart
+            case .stress: return .body
+            default: return .all
+            }
+        }
     }
 
     enum HistoryKind: UInt8, CaseIterable {
-        case sport = 0x02, sleep = 0x04, heart = 0x06, all = 0x09
+        case sport = 0x02, sleep = 0x04, heart = 0x06, all = 0x09, body = 0x33
 
         var deleteKey: UInt8 {
             switch self {
@@ -140,6 +194,7 @@ enum YC {
             case .sleep: return 0x41
             case .heart: return 0x42
             case .all:   return 0x44
+            case .body:  return 0x4E
             }
         }
 
@@ -149,6 +204,7 @@ enum YC {
             case .sleep: return "sueño"
             case .heart: return "pulso"
             case .all:   return "salud (HRV/SpO₂/temp)"
+            case .body:  return "estrés y energía"
             }
         }
     }
@@ -216,6 +272,51 @@ enum YC {
         let respiration: Int
         let hrv: Int
         let tempC: Double?
+    }
+    struct BodyRecord {
+        let time: Date
+        let load: Double, hrv: Double, stress: Double, energy: Double, sympathetic: Double
+        let sdnn: Int, vo2max: Int, pnn50: Int, rmssd: Int, lfhf: Double
+    }
+
+    /// Estrés / energía (historial 0x33), registros de 28 bytes.
+    static func parseBody(_ b: [UInt8]) -> [BodyRecord] {
+        var out: [BodyRecord] = []
+        var i = 0
+        func dec(_ a: UInt8, _ f: UInt8) -> Double { Double("\(a).\(f)") ?? Double(a) }
+        while i + 28 <= b.count {
+            out.append(BodyRecord(time: date(fromDevice: u32(b, i)),
+                                  load: dec(b[i + 4], b[i + 5]), hrv: dec(b[i + 6], b[i + 7]),
+                                  stress: dec(b[i + 8], b[i + 9]), energy: dec(b[i + 10], b[i + 11]),
+                                  sympathetic: dec(b[i + 12], b[i + 13]),
+                                  sdnn: u16(b, i + 14), vo2max: Int(b[i + 16]), pnn50: Int(b[i + 17]),
+                                  rmssd: u16(b, i + 18), lfhf: Double(b[i + 24]) / 10))
+            i += 28
+        }
+        return out
+    }
+
+    /// Datos combinados en vivo (06 03): [sistólica, diastólica, pulso, hrv?, spo2?, temp?]
+    struct RealCombined { let sbp: Int; let dbp: Int; let bpm: Int; let hrv: Int?; let spo2: Int?; let tempC: Double? }
+    static func parseRealCombined(_ p: [UInt8]) -> RealCombined? {
+        guard p.count >= 3 else { return nil }
+        let hrv = p.count > 3 ? Int(p[3]) : nil
+        let spo2 = p.count > 4 ? Int(p[4]) : nil
+        let temp = p.count > 6 && p[5] > 0 ? Double("\(p[5]).\(p[6])") : nil
+        return RealCombined(sbp: Int(p[0]), dbp: Int(p[1]), bpm: Int(p[2]), hrv: hrv, spo2: spo2, tempC: temp)
+    }
+
+    /// Muestras de ECG (06 05): enteros de 24 bits con signo.
+    static func parseECG(_ p: [UInt8]) -> [Int] {
+        var out: [Int] = []
+        var i = 0
+        while i + 2 < p.count {
+            var v = Int(p[i]) | Int(p[i + 1]) << 8 | Int(p[i + 2]) << 16
+            if p[i + 2] & 0x80 != 0 { v -= 1 << 24 }
+            out.append(v)
+            i += 3
+        }
+        return out
     }
     struct SleepStage { let type: Int; let start: Date; let seconds: Int } // 241 profundo, 242 ligero, 243 REM, 244 despierto
     struct SleepRecord { let start: Date; let end: Date; let stages: [SleepStage] }

@@ -11,6 +11,10 @@ enum Settings {
     static let healthSyncKey = "healthSync"
     static let deleteAfterSyncKey = "deleteAfterSync"
     static let heartIntervalKey = "heartInterval"
+    static let heartAlarmOnKey = "heartAlarmOn"
+    static let heartAlarmMaxKey = "heartAlarmMax"
+    static let wakeMinutesKey = "wakeMinutes"      // hora de despertar (minutos desde 00:00)
+    static let nameKey = "userName"
     static let lastSyncKey = "lastSync"
 
     private static var d: UserDefaults { .standard }
@@ -25,7 +29,11 @@ enum Settings {
             sleepNeedKey: 8.0,
             healthSyncKey: true,
             deleteAfterSyncKey: false,
-            heartIntervalKey: 10
+            heartIntervalKey: 10,
+            heartAlarmOnKey: false,
+            heartAlarmMaxKey: 160,
+            wakeMinutesKey: 7 * 60,
+            nameKey: ""
         ])
     }
 
@@ -38,6 +46,11 @@ enum Settings {
     static var healthSync: Bool { d.bool(forKey: healthSyncKey) }
     static var deleteAfterSync: Bool { d.bool(forKey: deleteAfterSyncKey) }
     static var heartInterval: Int { d.integer(forKey: heartIntervalKey) }
+    static var heartAlarmOn: Bool { d.bool(forKey: heartAlarmOnKey) }
+    static var heartAlarmMax: Int { d.integer(forKey: heartAlarmMaxKey) }
+    static var wakeMinutes: Int { d.integer(forKey: wakeMinutesKey) }
+    static var userName: String { d.string(forKey: nameKey) ?? "" }
+    static var hrMax: Double { 208 - 0.7 * Double(age) }
     static var lastSync: Date? {
         get { d.object(forKey: lastSyncKey) as? Date }
         set { d.set(newValue, forKey: lastSyncKey) }

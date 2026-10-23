@@ -25,8 +25,10 @@ final class HealthSample {
     var respiration: Int
     var tempC: Double?
     var steps: Int
+    var sbp: Int = 0
+    var dbp: Int = 0
 
-    init(time: Date, bpm: Int, hrv: Int, spo2: Int, respiration: Int, tempC: Double?, steps: Int) {
+    init(time: Date, bpm: Int, hrv: Int, spo2: Int, respiration: Int, tempC: Double?, steps: Int, sbp: Int = 0, dbp: Int = 0) {
         self.time = time
         self.bpm = bpm
         self.hrv = hrv
@@ -34,6 +36,75 @@ final class HealthSample {
         self.respiration = respiration
         self.tempC = tempC
         self.steps = steps
+        self.sbp = sbp
+        self.dbp = dbp
+    }
+}
+
+/// Estrés, energía corporal y variabilidad avanzada.
+@Model
+final class BodySample {
+    @Attribute(.unique) var time: Date
+    var stress: Double
+    var energy: Double
+    var load: Double
+    var hrv: Double
+    var sympathetic: Double
+    var sdnn: Int
+    var rmssd: Int
+    var vo2max: Int
+    var lfhf: Double
+
+    init(_ r: YC.BodyRecord) {
+        time = r.time; stress = r.stress; energy = r.energy; load = r.load; hrv = r.hrv
+        sympathetic = r.sympathetic; sdnn = r.sdnn; rmssd = r.rmssd; vo2max = r.vo2max; lfhf = r.lfhf
+    }
+}
+
+/// Entrenamiento registrado desde la app.
+@Model
+final class Workout {
+    @Attribute(.unique) var id: UUID
+    var start: Date
+    var end: Date
+    var sport: String
+    var avgHR: Int
+    var maxHR: Int
+    var strain: Double
+    var kcal: Int
+    var zoneSeconds: [Int]
+    var hrSeries: [Int]          // una muestra cada 5 s
+
+    init(start: Date, end: Date, sport: String, avgHR: Int, maxHR: Int, strain: Double, kcal: Int, zoneSeconds: [Int], hrSeries: [Int]) {
+        id = UUID()
+        self.start = start; self.end = end; self.sport = sport
+        self.avgHR = avgHR; self.maxHR = maxHR; self.strain = strain; self.kcal = kcal
+        self.zoneSeconds = zoneSeconds; self.hrSeries = hrSeries
+    }
+}
+
+/// Diario de hábitos de un día.
+@Model
+final class JournalEntry {
+    @Attribute(.unique) var day: Date
+    var yes: [String]
+    var answered: [String]
+
+    init(day: Date, yes: [String] = [], answered: [String] = []) {
+        self.day = day; self.yes = yes; self.answered = answered
+    }
+}
+
+/// Prueba de ECG.
+@Model
+final class ECGRecord {
+    @Attribute(.unique) var time: Date
+    var seconds: Int
+    var bpm: Int
+    var samples: [Int]
+
+    init(time: Date, seconds: Int, bpm: Int, samples: [Int]) {
+        self.time = time; self.seconds = seconds; self.bpm = bpm; self.samples = samples
     }
 }
 
@@ -102,5 +173,6 @@ final class SleepSession {
 }
 
 enum PhoopSchema {
-    static let models: [any PersistentModel.Type] = [HeartSample.self, HealthSample.self, ActivityInterval.self, SleepSession.self]
+    static let models: [any PersistentModel.Type] = [HeartSample.self, HealthSample.self, ActivityInterval.self, SleepSession.self,
+                                                     BodySample.self, Workout.self, JournalEntry.self, ECGRecord.self]
 }

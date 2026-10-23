@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct PhoopApp: App {
+struct RitmoApp: App {
     let container: ModelContainer
 
     init() {
@@ -11,6 +11,9 @@ struct PhoopApp: App {
         SyncEngine.registerBackground()
         SyncEngine.shared.attach(container)
         BandManager.shared.start()
+        _ = PhoneFinder.shared
+        _ = MeasureManager.shared
+        _ = ECGManager.shared
         SyncEngine.scheduleBackground()
     }
 

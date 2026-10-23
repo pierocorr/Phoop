@@ -10,7 +10,7 @@ final class HealthSync {
     private let store = HKHealthStore()
 
     private var shareTypes: Set<HKSampleType> {
-        var s: Set<HKSampleType> = [HKCategoryType(.sleepAnalysis)]
+        var s: Set<HKSampleType> = [HKCategoryType(.sleepAnalysis), HKObjectType.workoutType()]
         let q: [HKQuantityTypeIdentifier] = [.heartRate, .heartRateVariabilitySDNN, .oxygenSaturation,
                                              .respiratoryRate, .bodyTemperature, .stepCount,
                                              .distanceWalkingRunning, .activeEnergyBurned]
@@ -19,6 +19,43 @@ final class HealthSync {
     }
 
     var available: Bool { HKHealthStore.isHealthDataAvailable() }
+
+    private var bandDevice: HKDevice {
+        HKDevice(name: BandManager.displayName, manufacturer: "Loop Life", model: "SOOP",
+                 hardwareVersion: nil, firmwareVersion: BandManager.shared.firmware,
+                 softwareVersion: nil, localIdentifier: nil, udiDeviceIdentifier: nil)
+    }
+
+    /// Guarda un entrenamiento en Apple Salud (con su pulso y calorías).
+    func exportWorkout(_ w: Workout, sport: SportType) async {
+        guard Settings.healthSync, available else { return }
+        _ = await requestAuthorization()
+        guard store.authorizationStatus(for: HKObjectType.workoutType()) == .sharingAuthorized else { return }
+        let config = HKWorkoutConfiguration()
+        config.activityType = sport.hkType
+        config.locationType = .unknown
+        let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: bandDevice)
+        do {
+            try await builder.beginCollection(at: w.start)
+            let bpm = HKUnit.count().unitDivided(by: .minute())
+            var samples: [HKSample] = w.hrSeries.enumerated().compactMap { (i: Int, hr: Int) -> HKSample? in
+                guard hr > 0 else { return nil }
+                let t = w.start.addingTimeInterval(Double(i) * 5)
+                return HKQuantitySample(type: HKQuantityType(.heartRate), quantity: HKQuantity(unit: bpm, doubleValue: Double(hr)),
+                                        start: t, end: t)
+            }
+            if w.kcal > 0 {
+                samples.append(HKQuantitySample(type: HKQuantityType(.activeEnergyBurned),
+                                                quantity: HKQuantity(unit: .kilocalorie(), doubleValue: Double(w.kcal)),
+                                                start: w.start, end: w.end))
+            }
+            if !samples.isEmpty { try await builder.addSamples(samples) }
+            try await builder.endCollection(at: w.end)
+            _ = try await builder.finishWorkout()
+        } catch {
+            // Sin permiso o error de Salud: el entrenamiento queda guardado igual en la app.
+        }
+    }
 
     func requestAuthorization() async -> Bool {
         guard available else { return false }
@@ -36,9 +73,7 @@ final class HealthSync {
         _ = await requestAuthorization()
         let since = Date().addingTimeInterval(-Double(days) * 86400)
         var samples: [HKSample] = []
-        let device = HKDevice(name: BandManager.shared.deviceName, manufacturer: "Loop Life", model: "SOOP",
-                              hardwareVersion: nil, firmwareVersion: BandManager.shared.firmware,
-                              softwareVersion: nil, localIdentifier: nil, udiDeviceIdentifier: nil)
+        let device = bandDevice
 
         func meta(_ id: String) -> [String: Any] {
             [HKMetadataKeySyncIdentifier: "phoop.\(id)", HKMetadataKeySyncVersion: 1]

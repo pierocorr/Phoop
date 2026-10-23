@@ -1,6 +1,7 @@
 import Foundation
 import CoreBluetooth
 import Combine
+import UIKit
 
 /// Conexión con la pulsera SOOP por Bluetooth.
 @MainActor
@@ -42,6 +43,18 @@ final class BandManager: NSObject, ObservableObject {
 
     /// Pulso en vivo (para guardar muestras por minuto).
     let heartSubject = PassthroughSubject<Int, Never>()
+
+    enum Event {
+        case findPhone, takePhoto
+        case measureResult(type: UInt8, status: UInt8)   // status 1 = OK, 2 = falló
+        case combined(YC.RealCombined)
+        case ecg([Int])
+    }
+    /// Eventos que llegan desde la pulsera.
+    let events = PassthroughSubject<Event, Never>()
+
+    /// Nombre que se muestra dentro de la app.
+    static let displayName = "Ritmo Band"
 
     // MARK: CoreBluetooth
 
@@ -186,6 +199,7 @@ final class BandManager: NSObject, ObservableObject {
         _ = await request(YC.Cmd.getFunctions())
         _ = await request(YC.Cmd.getChip())
         await refreshDeviceInfo()
+        if UIApplication.shared.applicationState == .active { write(YC.Cmd.realtime(true)) }
         handshakeDone = true
         state = .ready
         resolveReadyWaiters(true)
@@ -277,6 +291,22 @@ final class BandManager: NSObject, ObservableObject {
         if p.group == YC.Group.real.rawValue {
             if p.key == 0x00, let s = YC.parseRealSport(p.payload) { liveSport = s }
             if p.key == 0x01, let hr = p.payload.first, hr > 0 { setHR(Int(hr)) }
+            if p.key == 0x03, let c = YC.parseRealCombined(p.payload) {
+                if c.bpm > 0 { setHR(c.bpm) }
+                events.send(.combined(c))
+            }
+            if p.key == 0x05 { events.send(.ecg(YC.parseECG(p.payload))) }
+        }
+        if p.group == YC.Group.devControl.rawValue {
+            switch p.key {
+            case 0x00: events.send(.findPhone)
+            case 0x03: events.send(.takePhoto)
+            case 0x0E where p.payload.count >= 2:
+                events.send(.measureResult(type: p.payload[0], status: p.payload[1]))
+            default: break
+            }
+            // La pulsera espera confirmación de los eventos que envía.
+            write(YC.frame(4, p.key, [0]))
         }
         if let w = pending, w.match(p) {
             pending = nil

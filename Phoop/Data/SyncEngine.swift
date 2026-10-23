@@ -36,6 +36,16 @@ final class SyncEngine: ObservableObject {
             .sink { [weak self] _ in Task { await self?.sync() } }
             .store(in: &bag)
 
+        // Al terminar una medición manual, descargar ese historial.
+        band.events
+            .sink { [weak self] ev in
+                if case let .measureResult(type, status) = ev, status == 1,
+                   let t = YC.MeasureType(rawValue: type) {
+                    Task { await self?.syncKinds([t.history]) }
+                }
+            }
+            .store(in: &bag)
+
         // Y cada 30 minutos mientras siga conectada.
         timer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { _ in
             Task { @MainActor in
@@ -43,6 +53,8 @@ final class SyncEngine: ObservableObject {
             }
         }
     }
+
+    func bump() { revision += 1 }
 
     private func saveLive(_ bpm: Int) {
         guard let container, Date().timeIntervalSince(lastLiveSave) >= 60 else { return }
@@ -57,7 +69,7 @@ final class SyncEngine: ObservableObject {
     /// Sincronización completa. Segura de llamar varias veces.
     @discardableResult
     func sync() async -> Bool {
-        guard !syncing, let container else { return false }
+        guard !syncing, container != nil else { return false }
         syncing = true
         defer { syncing = false }
         let band = BandManager.shared
@@ -74,9 +86,37 @@ final class SyncEngine: ObservableObject {
             settingsPushed = true
         }
 
+        let newItems = await fetch(YC.HistoryKind.allCases)
+        await band.refreshDeviceInfo()
+
+        if Settings.healthSync {
+            status = "Enviando a Apple Salud…"
+            _ = await HealthSync.shared.export(context: container.mainContext)
+        }
+
+        lastSync = Date()
+        Settings.lastSync = lastSync
+        status = newItems > 0 ? "Sincronizado · \(newItems) registros" : "Sincronizado"
+        revision += 1
+        Self.scheduleBackground()
+        return true
+    }
+
+    /// Descarga solo algunos historiales (p. ej. tras una medición manual).
+    func syncKinds(_ kinds: [YC.HistoryKind]) async {
+        guard !syncing, BandManager.shared.state == .ready else { return }
+        syncing = true
+        defer { syncing = false }
+        _ = await fetch(kinds)
+        if Settings.healthSync { _ = await HealthSync.shared.export(context: container.mainContext, days: 1) }
+        revision += 1
+    }
+
+    private func fetch(_ kinds: [YC.HistoryKind]) async -> Int {
+        let band = BandManager.shared
         let ctx = container.mainContext
         var newItems = 0
-        for kind in YC.HistoryKind.allCases {
+        for kind in kinds {
             status = "Descargando \(kind.label)…"
             guard let bytes = await band.fetchHistory(kind) else { continue }
             switch kind {
@@ -99,7 +139,13 @@ final class SyncEngine: ObservableObject {
             case .all:
                 for r in YC.parseAll(bytes) {
                     ctx.insert(HealthSample(time: r.time, bpm: r.bpm, hrv: r.hrv, spo2: r.spo2,
-                                            respiration: r.respiration, tempC: r.tempC, steps: r.steps))
+                                            respiration: r.respiration, tempC: r.tempC, steps: r.steps,
+                                            sbp: r.sbp, dbp: r.dbp))
+                    newItems += 1
+                }
+            case .body:
+                for r in YC.parseBody(bytes) {
+                    ctx.insert(BodySample(r))
                     newItems += 1
                 }
             }
@@ -108,23 +154,10 @@ final class SyncEngine: ObservableObject {
                 _ = await band.request(YC.Cmd.deleteHistory(kind), timeout: 3)
             }
         }
-
-        await band.refreshDeviceInfo()
-
-        if Settings.healthSync {
-            status = "Enviando a Apple Salud…"
-            _ = await HealthSync.shared.export(context: ctx)
-        }
-
-        lastSync = Date()
-        Settings.lastSync = lastSync
-        status = newItems > 0 ? "Sincronizado · \(newItems) registros" : "Sincronizado"
-        revision += 1
-        Self.scheduleBackground()
-        return true
+        return newItems
     }
 
-    /// Enviar ajustes a la pulsera (meta de pasos, datos de usuario, monitoreo).
+    /// Enviar ajustes a la pulsera (meta de pasos, datos de usuario, monitoreo, alarma).
     func pushSettings() async {
         let band = BandManager.shared
         guard band.state == .ready else { return }
@@ -134,6 +167,7 @@ final class SyncEngine: ObservableObject {
         _ = await band.request(YC.Cmd.heartMonitor(on: true, minutes: Settings.heartInterval))
         _ = await band.request(YC.Cmd.tempMonitor(on: true, minutes: Settings.heartInterval))
         _ = await band.request(YC.Cmd.spo2Monitor(on: true, minutes: max(30, Settings.heartInterval)))
+        _ = await band.request(YC.Cmd.heartAlarm(on: Settings.heartAlarmOn, max: Settings.heartAlarmMax))
     }
 
     // MARK: Segundo plano
