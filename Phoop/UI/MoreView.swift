@@ -48,10 +48,6 @@ struct MoreView: View {
                         Task { try? await Task.sleep(nanoseconds: 2_000_000_000); buzzed = false }
                     }
                     action("Cámara remota", "camera.fill") { showCamera = true }
-                    NavigationLink(value: Route.journal) {
-                        actionLabel("Diario", "book.closed.fill")
-                    }
-                    .pressable()
                 }
                 .disabled(band.state != .ready)
                 .appear(0.07)
@@ -237,87 +233,6 @@ struct MoreView: View {
             SectionLabel(text: title).padding(.leading, 4)
             Card { VStack(alignment: .leading, spacing: 12) { content() } }
         }
-    }
-}
-
-// MARK: - Diario
-
-struct JournalView: View {
-    @Environment(\.modelContext) private var context
-    @EnvironmentObject private var store: DayStore
-    @Query private var entries: [JournalEntry]
-    private let today = Calendar.current.startOfDay(for: Date())
-
-    private var entry: JournalEntry? { entries.first { $0.day == today } }
-
-    var body: some View {
-        Screen {
-            Text("Responde cada noche. Con unos días de datos, Ritmo te mostrará qué hábitos suben o bajan tu recuperación.")
-                .font(Theme.body(14)).foregroundStyle(Theme.secondary).appear()
-
-            VStack(spacing: 8) {
-                ForEach(Array(JournalQuestion.all.enumerated()), id: \.offset) { i, q in
-                    Card(padding: 14) {
-                        HStack(spacing: 12) {
-                            Image(systemName: q.icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.secondary)
-                                .frame(width: 34, height: 34).background(Theme.cardHi, in: RoundedRectangle(cornerRadius: 10))
-                            Text(q.text).font(Theme.body(14)).foregroundStyle(Theme.text)
-                            Spacer()
-                            answerButton(q, yes: false)
-                            answerButton(q, yes: true)
-                        }
-                    }
-                    .appear(0.03 + Double(i) * 0.02)
-                }
-            }
-
-            if !store.insights.isEmpty {
-                SectionLabel(text: "Lo que afecta tu recuperación").padding(.top, 6)
-                ForEach(store.insights) { ins in
-                    Card(padding: 14) {
-                        HStack(spacing: 12) {
-                            Image(systemName: ins.behavior.icon).foregroundStyle(ins.delta >= 0 ? Theme.recovery : Theme.bad)
-                            Text(ins.behavior.text.replacingOccurrences(of: "¿", with: "").replacingOccurrences(of: "?", with: ""))
-                                .font(Theme.body(14)).foregroundStyle(Theme.text)
-                            Spacer()
-                            Text("\(ins.delta >= 0 ? "+" : "")\(ins.delta) %").font(Theme.display(22, .semibold))
-                                .foregroundStyle(ins.delta >= 0 ? Theme.recovery : Theme.bad)
-                        }
-                    }
-                }
-            } else {
-                Card {
-                    Text("Completa el diario al menos 4 días para ver qué hábitos influyen en tu recuperación.")
-                        .font(Theme.body(13)).foregroundStyle(Theme.secondary)
-                }
-            }
-        }
-        .navigationTitle("Diario de hoy")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func answerButton(_ q: JournalQuestion, yes: Bool) -> some View {
-        let answered = entry?.answered.contains(q.id) ?? false
-        let isYes = entry?.yes.contains(q.id) ?? false
-        let selected = answered && (yes == isYes)
-        return Button {
-            withAnimation(.spring(response: 0.3)) { set(q, yes: yes) }
-        } label: {
-            Text(yes ? "Sí" : "No").font(Theme.body(13, .semibold))
-                .foregroundStyle(selected ? Theme.bg : Theme.secondary)
-                .frame(width: 44, height: 32)
-                .background(selected ? (yes ? Theme.recovery : Theme.secondary) : Theme.cardHi, in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func set(_ q: JournalQuestion, yes: Bool) {
-        let e: JournalEntry
-        if let existing = entry { e = existing } else { e = JournalEntry(day: today); context.insert(e) }
-        if !e.answered.contains(q.id) { e.answered.append(q.id) }
-        e.yes.removeAll { $0 == q.id }
-        if yes { e.yes.append(q.id) }
-        try? context.save()
     }
 }
 

@@ -8,7 +8,6 @@ struct HomeView: View {
     @EnvironmentObject private var store: DayStore
     @AppStorage(Settings.stepGoalKey) private var stepGoal = 11000
     @AppStorage(Settings.nameKey) private var name = ""
-    @Query private var journal: [JournalEntry]
 
     private var d: DayMetrics { store.day }
     private var steps: Int { d.isToday ? max(d.steps, band.liveSport?.steps ?? 0) : d.steps }
@@ -31,7 +30,6 @@ struct HomeView: View {
 
                 if d.isToday {
                     sleepCoachCard.appear(0.13)
-                    journalCard.appear(0.16)
                 }
 
                 SectionLabel(text: "Métricas clave").padding(.top, 4).appear(0.18)
@@ -177,28 +175,6 @@ struct HomeView: View {
                             .font(Theme.display(22, .semibold)).foregroundStyle(Theme.text)
                         Text("para despertar a las \(plan.wake.formatted(date: .omitted, time: .shortened)) al 100 %")
                             .font(Theme.body(13)).foregroundStyle(Theme.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.secondary)
-                }
-            }
-        }
-        .pressable()
-    }
-
-    private var journalCard: some View {
-        let today = Calendar.current.startOfDay(for: Date())
-        let done = journal.contains { $0.day == today && !$0.answered.isEmpty }
-        return NavigationLink(value: Route.journal) {
-            Card {
-                HStack(spacing: 14) {
-                    Image(systemName: done ? "checkmark.circle.fill" : "book.closed.fill").font(.system(size: 22))
-                        .foregroundStyle(done ? Theme.recovery : Theme.warn)
-                        .frame(width: 44, height: 44).background(Theme.cardHi, in: Circle())
-                    VStack(alignment: .leading, spacing: 3) {
-                        SectionLabel(text: "Diario")
-                        Text(done ? "Diario de hoy completo" : "¿Cómo fue tu día?").font(Theme.display(22, .semibold)).foregroundStyle(Theme.text)
-                        Text("Descubre qué hábitos mejoran tu recuperación").font(Theme.body(13)).foregroundStyle(Theme.secondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.secondary)

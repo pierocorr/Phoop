@@ -8,7 +8,6 @@ final class DayStore: ObservableObject {
     @Published private(set) var day = DayMetrics()
     @Published private(set) var today = DayMetrics()
     @Published private(set) var history: [DayMetrics] = []   // últimos 30 días
-    @Published private(set) var insights: [MetricsEngine.Insight] = []
 
     func refresh(_ context: ModelContext) {
         today = MetricsEngine.compute(context: context)
@@ -17,7 +16,6 @@ final class DayStore: ObservableObject {
 
     func refreshHistory(_ context: ModelContext) {
         history = MetricsEngine.history(context: context, days: 30)
-        insights = MetricsEngine.journalInsights(context: context)
     }
 
     func move(_ delta: Int, _ context: ModelContext) {
@@ -35,7 +33,7 @@ final class DayStore: ObservableObject {
 }
 
 enum Route: Hashable {
-    case recovery, sleep, strain, journal, metric(MetricsEngine.TrendMetric), ecgHistory, workout(UUID)
+    case recovery, sleep, strain, metric(MetricsEngine.TrendMetric), ecgHistory, workout(UUID)
 }
 
 struct RootView: View {
@@ -78,12 +76,13 @@ struct RootView: View {
         .onChange(of: phase) { _, p in
             if p == .active {
                 band.start()
-                band.readPedometer()
+                band.startLiveSteps()
                 if band.state == .ready { band.send(YC.Cmd.realtime(true)) }
                 store.refresh(context)
                 Task { await sync.sync() }
-            } else if p == .background, !WorkoutManager.shared.active {
-                band.send(YC.Cmd.realtime(false))
+            } else if p == .background {
+                band.stopLiveSteps()
+                if !WorkoutManager.shared.active { band.send(YC.Cmd.realtime(false)) }
             }
         }
         .overlay {
@@ -119,7 +118,6 @@ struct RouteDestinations: ViewModifier {
             case .recovery: RecoveryDetailView()
             case .sleep: SleepDetailView()
             case .strain: StrainDetailView()
-            case .journal: JournalView()
             case .metric(let m): MetricDetailView(metric: m)
             case .ecgHistory: ECGHistoryView()
             case .workout(let id): WorkoutDetailView(id: id)

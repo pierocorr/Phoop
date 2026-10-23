@@ -199,7 +199,10 @@ final class BandManager: NSObject, ObservableObject {
         _ = await request(YC.Cmd.getFunctions())
         _ = await request(YC.Cmd.getChip())
         await refreshDeviceInfo()
-        if UIApplication.shared.applicationState == .active { write(YC.Cmd.realtime(true)) }
+        if UIApplication.shared.applicationState == .active {
+            write(YC.Cmd.realtime(true))
+            startLiveSteps()
+        }
         handshakeDone = true
         state = .ready
         resolveReadyWaiters(true)
@@ -332,6 +335,28 @@ final class BandManager: NSObject, ObservableObject {
 
     func readPedometer() {
         if let p = peripheral, let c = pedometerChar { p.readValue(for: c) }
+    }
+
+    // MARK: Pasos en vivo
+
+    private var stepTimer: Timer?
+
+    /// Mientras la app está abierta, pide los pasos a la pulsera cada 2 s.
+    func startLiveSteps() {
+        stepTimer?.invalidate()
+        readPedometer()
+        stepTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+            Task { @MainActor in
+                let b = BandManager.shared
+                guard b.state == .ready, UIApplication.shared.applicationState == .active else { return }
+                b.readPedometer()
+            }
+        }
+    }
+
+    func stopLiveSteps() {
+        stepTimer?.invalidate()
+        stepTimer = nil
     }
 }
 

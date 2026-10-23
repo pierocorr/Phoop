@@ -4,7 +4,6 @@ App local para iPhone para la pulsera **Loop Life (SOOP)**. Todo se guarda en el
 
 - **Inicio:** Sueño, Recuperación y Esfuerzo con anillos animados, navegación por días y recomendación diaria
 - **Entrenador de sueño:** a qué hora acostarte según tu deuda de sueño y el esfuerzo del día
-- **Diario de hábitos:** descubre qué sube o baja tu recuperación
 - **Tendencias:** semana y mes para recuperación, esfuerzo, sueño, HRV, pulso en reposo, pasos, SpO₂ y estrés
 - **Entrenar:** pulso en vivo, zonas, esfuerzo y calorías; se guarda en Apple Salud
 - **Salud:** medición manual (pulso, SpO₂, HRV, estrés, temperatura), estrés y energía, presión estimada, ECG (beta)
