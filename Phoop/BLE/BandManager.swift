@@ -284,15 +284,19 @@ final class BandManager: NSObject, ObservableObject {
 
     private func handle(_ p: YC.Packet) {
         // La pulsera repite su dirección MAC (02 02) cada ~20 s: no ensuciar el registro.
-        let isMacEcho = p.group == 2 && p.key == 2 && pending?.match(p) != true
+        let isMacEcho = (p.group == 2 && (p.key == 2 || p.key == 0x0C)) && pending?.match(p) != true
         if !isMacEcho { appendLog(outgoing: false, "\(String(format: "%02X %02X", p.group, p.key)) · \(YC.hex(p.payload))\(p.crcOK ? "" : " (CRC!)")") }
 
         if p.group == YC.Group.health.rawValue, historyKind != nil {
             handleHistory(p)
             return
         }
+        if p.group == YC.Group.get.rawValue, p.key == 0x0C, p.payload.count > 6 {
+            let b = p.payload
+            updateSteps(YC.RealSport(steps: YC.u24(b, 0), distanceM: YC.u16(b, 5), kcal: YC.u16(b, 3)), source: "02 0C")
+        }
         if p.group == YC.Group.real.rawValue {
-            if p.key == 0x00, let s = YC.parseRealSport(p.payload) { liveSport = s }
+            if p.key == 0x00, let s = YC.parseRealSport(p.payload) { updateSteps(s, source: "06 00") }
             if p.key == 0x01, let hr = p.payload.first, hr > 0 { setHR(Int(hr)) }
             if p.key == 0x03, let c = YC.parseRealCombined(p.payload) {
                 if c.bpm > 0 { setHR(c.bpm) }
@@ -341,7 +345,11 @@ final class BandManager: NSObject, ObservableObject {
 
     private var stepTimer: Timer?
 
-    /// Mientras la app está abierta, pide los pasos a la pulsera cada 2 s.
+    private var stepTick = 0
+    private var stepsDay = Calendar.current.startOfDay(for: Date())
+
+    /// Mientras la app está abierta, pide los pasos a la pulsera cada 2 s
+    /// (alternando las dos fuentes que tiene la pulsera).
     func startLiveSteps() {
         stepTimer?.invalidate()
         readPedometer()
@@ -349,9 +357,27 @@ final class BandManager: NSObject, ObservableObject {
             Task { @MainActor in
                 let b = BandManager.shared
                 guard b.state == .ready, UIApplication.shared.applicationState == .active else { return }
-                b.readPedometer()
+                b.stepTick += 1
+                if b.stepTick % 2 == 0 { b.readPedometer() } else { b.writeQuiet(YC.Cmd.nowSteps()) }
             }
         }
+    }
+
+    /// Actualiza los pasos en vivo (nunca baja durante el mismo día).
+    private func updateSteps(_ s: YC.RealSport, source: String) {
+        let today = Calendar.current.startOfDay(for: Date())
+        if today != stepsDay { stepsDay = today; liveSport = nil }
+        let current = liveSport?.steps ?? -1
+        guard s.steps >= current else { return }
+        if s.steps != current { appendLog(outgoing: false, "Pasos \(s.steps) (\(source))") }
+        liveSport = s
+    }
+
+    /// Escribe sin anotar en el registro (consultas repetitivas).
+    private func writeQuiet(_ data: Data) {
+        guard let p = peripheral, let c = commandChar else { return }
+        let canNoResp = c.properties.contains(.writeWithoutResponse)
+        p.writeValue(data, for: c, type: (writeWithResponse || !canNoResp) ? .withResponse : .withoutResponse)
     }
 
     func stopLiveSteps() {
@@ -479,7 +505,7 @@ extension BandManager: CBPeripheralDelegate {
             case CBUUID(string: YC.heartMeasure):
                 if let hr = YC.parseHeartMeasurement(data), hr > 0 { setHR(hr) }
             case CBUUID(string: YC.pedometerChar):
-                if let s = YC.parsePedometer(data) { liveSport = s }
+                if let s = YC.parsePedometer(data) { updateSteps(s, source: "FEA1") }
             default: break
             }
         }
