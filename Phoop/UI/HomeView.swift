@@ -57,7 +57,7 @@ struct HomeView: View {
                 .pressable()
                 .padding(.trailing, 20).padding(.bottom, 18)
             }
-            .background(Theme.bg.ignoresSafeArea())
+            .background(Theme.background)
             .routes()
             .toolbar(.hidden, for: .navigationBar)
         }
@@ -67,16 +67,7 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack {
-            Button { store.tab = 3 } label: {
-                Text(name.first.map { String($0).uppercased() } ?? "")
-                    .font(Theme.body(15, .bold)).foregroundStyle(Theme.bg)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.recovery, in: Circle())
-                    .overlay {
-                        if name.isEmpty { Image(systemName: "person.fill").foregroundStyle(Theme.bg) }
-                    }
-            }
-            .accessibilityLabel("Perfil")
+            AvatarButton(size: 38)
             Spacer()
             HStack(spacing: 0) {
                 Button { store.move(-1, context) } label: {

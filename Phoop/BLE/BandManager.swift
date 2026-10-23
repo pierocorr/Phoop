@@ -83,6 +83,58 @@ final class BandManager: NSObject, ObservableObject {
         central = CBCentralManager(delegate: self, queue: nil,
                                    options: [CBCentralManagerOptionRestoreIdentifierKey: "phoop.central",
                                              CBCentralManagerOptionShowPowerAlertKey: true])
+        startWatchdog()
+    }
+
+    // MARK: Vigilante de conexión
+
+    private var stateSince = Date()
+    private var watchdog: Timer?
+    private var broadScan = false
+
+    /// Cada 4 s revisa que la conexión avance; si se queda trabada, reintenta.
+    private func startWatchdog() {
+        watchdog = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
+            Task { @MainActor in BandManager.shared.checkConnection() }
+        }
+    }
+
+    private func checkConnection() {
+        guard central.state == .poweredOn else { return }
+        let stuck = Date().timeIntervalSince(stateSince)
+        switch state {
+        case .ready:
+            return
+        case .off, .disconnected:
+            if stuck > 4 { start() }
+        case .searching:
+            // Si no aparece buscando por el servicio de pulso, buscar cualquier dispositivo por nombre.
+            if stuck > 8 && !broadScan {
+                broadScan = true
+                central.stopScan()
+                appendLog(outgoing: false, "Buscando la pulsera por nombre…")
+                central.scanForPeripherals(withServices: nil, options: nil)
+            }
+            if stuck > 25 { central.stopScan(); broadScan = false; peripheral = nil; setState(.disconnected) }
+        case .connecting:
+            if stuck > 12, let p = peripheral {
+                appendLog(outgoing: false, "Reintentando conexión…")
+                central.cancelPeripheralConnection(p)
+                peripheral = nil
+                setState(.disconnected)
+            }
+        case .handshaking:
+            if stuck > 15 {
+                appendLog(outgoing: false, "Reintentando saludo…")
+                handshakeStarted = false
+                Task { await self.handshake() }
+            }
+        }
+    }
+
+    private func setState(_ s: ConnState) {
+        if s != state { stateSince = Date() }
+        state = s
     }
 
     // MARK: Conexión
@@ -104,7 +156,8 @@ final class BandManager: NSObject, ObservableObject {
             connect(p)
             return
         }
-        state = .searching
+        setState(.searching)
+        broadScan = false
         central.scanForPeripherals(withServices: [CBUUID(string: YC.heartService)], options: nil)
     }
 
@@ -113,13 +166,13 @@ final class BandManager: NSObject, ObservableObject {
         if let p = peripheral { central.cancelPeripheralConnection(p) }
         peripheral = nil
         handshakeDone = false
-        state = .disconnected
+        setState(.disconnected)
     }
 
     private func connect(_ p: CBPeripheral) {
         peripheral = p
         p.delegate = self
-        state = .connecting
+        setState(.connecting)
         central.connect(p, options: nil)
     }
 
@@ -184,7 +237,7 @@ final class BandManager: NSObject, ObservableObject {
     // MARK: Saludo inicial (igual que la app oficial)
 
     private func handshake() async {
-        state = .handshaking
+        setState(.handshaking)
         var name = await request(YC.Cmd.getName())
         if name == nil {
             // Probar el otro tipo de escritura.
@@ -204,7 +257,7 @@ final class BandManager: NSObject, ObservableObject {
             startLiveSteps()
         }
         handshakeDone = true
-        state = .ready
+        setState(.ready)
         resolveReadyWaiters(true)
     }
 
@@ -392,7 +445,7 @@ extension BandManager: CBCentralManagerDelegate {
 
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         MainActor.assumeIsolated {
-            if central.state == .poweredOn { start() } else { state = .off }
+            if central.state == .poweredOn { start() } else { setState(.off) }
         }
     }
 
@@ -431,7 +484,7 @@ extension BandManager: CBCentralManagerDelegate {
 
     nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         MainActor.assumeIsolated {
-            state = .disconnected
+            setState(.disconnected)
             appendLog(outgoing: false, "No se pudo conectar: \(error?.localizedDescription ?? "-")")
             central.connect(peripheral, options: nil)
         }
@@ -439,7 +492,7 @@ extension BandManager: CBCentralManagerDelegate {
 
     nonisolated func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         MainActor.assumeIsolated {
-            state = .disconnected
+            setState(.disconnected)
             commandChar = nil; eventChar = nil
             handshakeDone = false
             handshakeStarted = false

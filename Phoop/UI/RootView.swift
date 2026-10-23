@@ -111,7 +111,7 @@ struct Screen<Content: View>: View {
                 .padding(.top, 12)
                 .padding(.bottom, 28)
         }
-        .background(Theme.bg.ignoresSafeArea())
+        .background(Theme.background)
         .scrollIndicators(.hidden)
     }
 }

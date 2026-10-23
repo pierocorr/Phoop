@@ -3,29 +3,35 @@ import UIKit
 import Charts
 
 enum Theme {
-    static let bg = Color(hex: 0x0B0D10)
-    static let card = Color(hex: 0x15181D)
-    static let cardHi = Color(hex: 0x1C2026)
-    static let track = Color(hex: 0x252A31)
-    static let divider = Color(hex: 0x1F242B)
+    static let bg = Color(hex: 0x15191E)
+    static let card = Color(hex: 0x22272E)
+    static let cardHi = Color(hex: 0x2C323A)
+    static let track = Color(hex: 0x2F353D)
+    static let divider = Color(hex: 0x2B3139)
     static let tabBar = Color(hex: 0x111418)
     static let text = Color(hex: 0xF2F4F7)
-    static let secondary = Color(hex: 0x9AA3AF)
+    static let secondary = Color(hex: 0x9AA4B1)
 
-    static let recovery = Color(hex: 0x38E0B0)
-    static let strain = Color(hex: 0xFF8A3D)
-    static let sleep = Color(hex: 0x8F8CFF)
+    static let recovery = Color(hex: 0x2EE06A)
+    static let strain = Color(hex: 0x2E9BFF)
+    static let sleep = Color(hex: 0x8EB1C9)
     static let health = Color(hex: 0x5AC8FA)
-    static let warn = Color(hex: 0xFFB27A)
-    static let bad = Color(hex: 0xFF6B6B)
+    static let warn = Color(hex: 0xFFB547)
+    static let bad = Color(hex: 0xFF5C5C)
 
-    static let deep = Color(hex: 0x4F4ACF)
-    static let light = Color(hex: 0x8F8CFF)
-    static let rem = Color(hex: 0xC4C2FF)
+    static let deep = Color(hex: 0x3D6E91)
+    static let light = Color(hex: 0x8EB1C9)
+    static let rem = Color(hex: 0xC6DCEB)
     static let awake = Color(hex: 0xE8E9EE)
 
-    static let zoneColors: [Color] = [Color(hex: 0xFFD2AE), Color(hex: 0xFFB27A), Color(hex: 0xFF9A4D), Color(hex: 0xFF7A45), Color(hex: 0xFF5A5A)]
+    static let zoneColors: [Color] = [Color(hex: 0x9FD3FF), Color(hex: 0x5DB4FF), Color(hex: 0x2E9BFF), Color(hex: 0xFFB547), Color(hex: 0xFF5C5C)]
     static let zoneNames = ["Z1 · ligero", "Z2 · suave", "Z3 · medio", "Z4 · duro", "Z5 · máx"]
+
+    /// Fondo con un leve degradado gris azulado hacia arriba.
+    static var background: some View {
+        LinearGradient(colors: [Color(hex: 0x232A33), Color(hex: 0x15191E)], startPoint: .top, endPoint: .center)
+            .ignoresSafeArea()
+    }
 
     static func recoveryColor(_ v: Int?) -> Color {
         guard let v else { return secondary }

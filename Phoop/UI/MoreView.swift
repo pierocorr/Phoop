@@ -18,6 +18,7 @@ struct MoreView: View {
     @AppStorage(Settings.heartAlarmMaxKey) private var alarmMax = 160
     @AppStorage(Settings.nameKey) private var name = ""
     @State private var showLog = false
+    @StateObject private var avatar = AvatarStore.shared
     @State private var showCamera = false
     @State private var buzzed = false
     @State private var pushTask: Task<Void, Never>?
@@ -53,6 +54,18 @@ struct MoreView: View {
                 .appear(0.07)
 
                 section("Perfil") {
+                    HStack(spacing: 14) {
+                        AvatarButton(size: 64)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Foto de perfil").font(Theme.body(14, .semibold))
+                            Text("Toca la imagen para cambiarla").font(Theme.body(12)).foregroundStyle(Theme.secondary)
+                        }
+                        Spacer()
+                        if avatar.image != nil {
+                            Button("Quitar", role: .destructive) { avatar.remove() }.font(Theme.body(13))
+                        }
+                    }
+                    divider
                     HStack {
                         Text("Nombre").font(Theme.body(14))
                         TextField("Tu nombre", text: $name).multilineTextAlignment(.trailing).foregroundStyle(Theme.secondary)
